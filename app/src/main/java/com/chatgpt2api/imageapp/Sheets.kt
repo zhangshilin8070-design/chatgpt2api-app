@@ -1,5 +1,7 @@
 package com.chatgpt2api.imageapp
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -42,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -398,6 +402,32 @@ internal fun SettingsSheet(actions: ImageAppViewModel, onDismiss: () -> Unit) {
                     Text("仅清理本地内存缓存", fontSize = 11.sp, color = Glass.TextSecondary)
                 }
                 Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = Glass.TextSecondary)
+            }
+            HorizontalDivider(color = Glass.GlassBorder)
+
+            // 加入 QQ 群
+            val joinGroupContext = LocalContext.current
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = {
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://qm.qq.com/q/wAvLW3ejKi"))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                joinGroupContext.startActivity(intent)
+                            }
+                        })
+                    }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("加入 QQ 群", fontSize = 13.sp, color = Glass.TextPrimary, fontWeight = FontWeight.Medium)
+                    Text("折页 · 群号 441035011", fontSize = 11.sp, color = Glass.TextSecondary)
+                }
+                Icon(Icons.Default.Forum, contentDescription = null, modifier = Modifier.size(16.dp), tint = Glass.TextSecondary)
             }
             HorizontalDivider(color = Glass.GlassBorder)
 

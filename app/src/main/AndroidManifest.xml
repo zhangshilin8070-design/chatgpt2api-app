@@ -7,6 +7,9 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- 应用内更新：下载 APK 到 cache 并调起系统安装器。Android 8.0+ 必须申请
+         REQUEST_INSTALL_PACKAGES，未授予时回退到浏览器下载。-->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".ImageApp"
@@ -27,5 +30,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- 通过 FileProvider 把下载到 cache/updates/*.apk 暴露给系统安装器，
+             避免 Android 7.0+ 的 file:// FileUriExposedException。-->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
     </application>
 </manifest>

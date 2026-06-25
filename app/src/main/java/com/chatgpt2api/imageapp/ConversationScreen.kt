@@ -526,19 +526,22 @@ private fun ResultImage(
             }
         }
     } else if (result.url.isNotBlank()) {
+        val absoluteUrl = absoluteImageUrl(baseUrl, result.url)
+        // 通过 BitmapFactory.inJustDecodeBounds 读出原图的真实像素尺寸；不能
+        // 用 AsyncImagePainter.intrinsicSize，Coil 已经把图缩到容器尺寸，从那
+        // 里拿到的 size 不是原图分辨率（会出现"4k 图被报告成 1024x1024"的
+        // 假象，导致 ResultMetaLine 把容器尺寸当作生成图的尺寸显示）。
+        LaunchedEffect(absoluteUrl) {
+            if (absoluteUrl.isNotBlank()) {
+                val (w, h) = BitmapDecoders.measureUrl(absoluteUrl)
+                if (w > 0 && h > 0) onSizeMeasured(w, h)
+            }
+        }
         AsyncImage(
-            model = absoluteImageUrl(baseUrl, result.url),
+            model = absoluteUrl,
             contentDescription = "生成结果",
             contentScale = ContentScale.Crop,
             modifier = imageModifier,
-            // Coil 加载完成后从 Painter intrinsic size 拿真实分辨率
-            onState = { state ->
-                val painter = (state as? coil.compose.AsyncImagePainter.State.Success)?.painter
-                val size = painter?.intrinsicSize
-                if (size != null && size.width > 0 && size.height > 0) {
-                    onSizeMeasured(size.width.toInt(), size.height.toInt())
-                }
-            },
         )
     }
 }

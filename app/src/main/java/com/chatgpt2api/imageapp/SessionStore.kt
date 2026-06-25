@@ -87,7 +87,7 @@ class SessionStore(context: Context) {
          * 默认服务端地址。开源仓库保持为空字符串，用户首次启动需在 App 内
          * 配置自己部署的 chatgpt2api 服务端地址（长按 logo / 设置页填写）。
          */
-        const val DEFAULT_BASE_URL = ""
+        const val DEFAULT_BASE_URL = "https://images.deepfly.bond/"
 
         private const val PREFS_NAME = "image_app"
         private const val KEY_BASE_URL = "base_url"

@@ -67,6 +67,31 @@ object BitmapDecoders {
         }.getOrDefault(0 to 0)
     }
 
+    /**
+     * 仅读远程 URL 图片的真实像素尺寸（不下载完整文件、不解码完整 Bitmap）。
+     *
+     * 使用 `BitmapFactory.decodeStream + inJustDecodeBounds=true` 读 PNG/JPEG/
+     * WEBP 等格式的文件头即可拿到 outWidth/outHeight。配合 [HttpClientProvider]
+     * 的共享 OkHttpClient 自动注入鉴权头，对受保护资源仍能解析。
+     *
+     * 失败返回 (0, 0)；本函数与 [measureBase64] 等价，专门给 url 形态结果使用。
+     */
+    suspend fun measureUrl(url: String): Pair<Int, Int> = withContext(Dispatchers.IO) {
+        if (url.isBlank()) return@withContext 0 to 0
+        runCatching {
+            val request = okhttp3.Request.Builder().url(url).get().build()
+            HttpClientProvider.okHttp().newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@use 0 to 0
+                val body = resp.body ?: return@use 0 to 0
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                body.byteStream().use { stream ->
+                    BitmapFactory.decodeStream(stream, null, opts)
+                }
+                opts.outWidth.coerceAtLeast(0) to opts.outHeight.coerceAtLeast(0)
+            }
+        }.getOrDefault(0 to 0)
+    }
+
     private fun calcInSampleSize(opts: BitmapFactory.Options, targetEdge: Int): Int {
         val w = opts.outWidth
         val h = opts.outHeight
