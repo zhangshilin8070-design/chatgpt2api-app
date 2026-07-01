@@ -104,6 +104,14 @@ internal fun Composer(
             }
 
             // 参考图：横向滚动条而不是 FlowRow 自动换行，避免多张图把 Composer 顶高。
+            if (state.mode == ComposerMode.Image && state.industryOptions.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                IndustryChipRow(
+                    options = state.industryOptions,
+                    selected = state.industryKey,
+                    onSelect = actions::updateIndustryKey,
+                )
+            }
             if (state.pendingReferences.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 androidx.compose.foundation.lazy.LazyRow(
@@ -231,6 +239,46 @@ private fun IconActionButton(
                 modifier = Modifier.size(16.dp),
                 tint = if (enabled) Glass.Ink else Glass.TextSecondary,
             )
+        }
+    }
+}
+
+/** 行业提示词选择行：单行滚动 chip 列表；点击切换选中状态，再点一次取消。 */
+@Composable
+private fun IndustryChipRow(
+    options: List<IndustryPromptOption>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    androidx.compose.foundation.lazy.LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        contentPadding = PaddingValues(horizontal = 0.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        items(options.size) { index ->
+            val opt = options[index]
+            val active = opt.industryKey == selected
+            val bg = if (active) Glass.Ink else Glass.Surface
+            val fg = if (active) Color.White else Glass.Ink
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(bg)
+                    .border(1.dp, if (active) Glass.Ink else Glass.GlassBorder, RoundedCornerShape(999.dp))
+                    .pointerInput(active) {
+                        detectTapGestures(onTap = {
+                            onSelect(if (active) "" else opt.industryKey)
+                        })
+                    }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = if (opt.hasOverride) "${opt.label} · 我的" else opt.label,
+                    fontSize = 12.sp,
+                    color = fg,
+                )
+            }
         }
     }
 }
