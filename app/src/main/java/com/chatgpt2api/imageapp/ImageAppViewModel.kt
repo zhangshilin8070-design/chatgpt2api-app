@@ -103,6 +103,10 @@ data class ComposerState(
     val optimizing: Boolean = false,
     val refreshingModels: Boolean = false,
     val error: String = "",
+    /** 用户当前选中的行业提示词 key；空 = 不附加。 */
+    val industryKey: String = "",
+    /** 后端下发的可用行业列表（enabled=true）。 */
+    val industryOptions: List<IndustryPromptOption> = emptyList(),
 )
 
 /** 会话列表 + 当前选中会话。 */
@@ -418,6 +422,23 @@ class ImageAppViewModel(application: Application) : AndroidViewModel(application
             _composer.update {
                 it.copy(models = models, model = if (it.model in models) it.model else models.first(), error = "")
             }
+            // 行业提示词与模型一样属于登录后一次性拉取的元数据；失败不阻塞创作流程。
+            try {
+                val industries = api.fetchIndustryPrompts(config)
+                val current = try {
+                    api.fetchCurrentIndustry(config)
+                } catch (_: Exception) {
+                    CurrentIndustry("", false)
+                }
+                _composer.update {
+                    it.copy(
+                        industryOptions = industries,
+                        industryKey = if (current.effective) current.industryKey else "",
+                    )
+                }
+            } catch (_: Exception) {
+                // 静默：行业提示词非关键路径
+            }
         } catch (e: UnauthorizedException) {
             handleSignedOut(e.message ?: "登录已过期，请重新登录")
         } catch (e: Exception) {
@@ -451,6 +472,50 @@ class ImageAppViewModel(application: Application) : AndroidViewModel(application
     fun updateImageResolution(value: String) = _composer.update { it.copy(imageResolution = value) }
     fun updateVisibility(value: String) = _composer.update { it.copy(visibility = value) }
     fun updateN(value: Int) = _composer.update { it.copy(n = value.coerceIn(1, 4)) }
+
+    /**
+     * 更新用户选中的行业（industry_key），空字符串表示取消行业提示词。
+     * 立即在本地状态生效，并异步同步到 `/api/profile/current-industry`。
+     * 同步失败不回滚本地选择，仅在下次刷新时以后端为准（避免网络抖动导致的
+     * 前端选择不可用）。
+     */
+    fun updateIndustryKey(value: String) {
+        val cleaned = value.trim()
+        _composer.update { it.copy(industryKey = cleaned) }
+        val cfg = currentConfig() ?: return
+        viewModelScope.launch {
+            try {
+                api.setCurrentIndustry(cfg, cleaned)
+            } catch (_: Exception) {
+                // 静默失败：非关键路径
+            }
+        }
+    }
+
+    /**
+     * 首次登录 / 手动刷新时从后端拉取当前行业与可用行业列表。
+     */
+    fun refreshIndustryOptions() {
+        val cfg = currentConfig() ?: return
+        viewModelScope.launch {
+            try {
+                val list = api.fetchIndustryPrompts(cfg)
+                val current = try {
+                    api.fetchCurrentIndustry(cfg)
+                } catch (_: Exception) {
+                    CurrentIndustry("", false)
+                }
+                _composer.update {
+                    it.copy(
+                        industryOptions = list,
+                        industryKey = if (current.effective) current.industryKey else "",
+                    )
+                }
+            } catch (_: Exception) {
+                // 静默失败
+            }
+        }
+    }
 
     fun addReferences(uris: List<Uri>) {
         viewModelScope.launch {
@@ -710,6 +775,7 @@ class ImageAppViewModel(application: Application) : AndroidViewModel(application
                     model = composer.model, size = composer.size, quality = composer.quality,
                     n = composer.n, outputFormat = composer.outputFormat,
                     imageResolution = composer.imageResolution, visibility = composer.visibility,
+                    industryKey = composer.industryKey,
                 )
                 val created = when (mode) {
                     TurnMode.Generate -> api.createGenerationTask(config, turn.taskId, prompt, options, history)

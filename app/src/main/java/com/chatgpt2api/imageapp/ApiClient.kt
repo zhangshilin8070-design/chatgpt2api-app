@@ -40,6 +40,7 @@ data class ImageRequestOptions(
     val outputFormat: String = "png",
     val imageResolution: String = "",
     val visibility: String = "private",
+    val industryKey: String = "",
 )
 
 /** 多轮上下文中的一条消息。content 为纯文本（与 Web 常规路径一致）。 */
@@ -47,6 +48,19 @@ data class ChatMessage(val role: String, val content: String)
 
 /** 待上传的参考图二进制（来源：用户选图或上一轮结果图）。 */
 data class ReferenceBytes(val name: String, val mimeType: String, val bytes: ByteArray)
+
+data class IndustryPromptOption(
+    val industryKey: String,
+    val label: String,
+    val description: String = "",
+    val hasOverride: Boolean = false,
+    val resolvedPrompt: String = "",
+)
+
+data class CurrentIndustry(
+    val industryKey: String,
+    val effective: Boolean,
+)
 
 data class AppConfig(
     val baseUrl: String = "",
@@ -411,6 +425,7 @@ class ApiClient {
             .addFormDataPart("visibility", normalizeVisibility(options.visibility))
         normalizeQuality(options.quality)?.let { form.addFormDataPart("quality", it) }
         normalizeResolution(options.imageResolution)?.let { form.addFormDataPart("image_resolution", it) }
+        options.industryKey.trim().takeIf { it.isNotEmpty() }?.let { form.addFormDataPart("industry_key", it) }
         if (messages.isNotEmpty()) {
             form.addFormDataPart("messages", messagesToJson(messages).toString())
         }
@@ -458,6 +473,65 @@ class ApiClient {
         parseTask(executeJson(request))
     }
 
+    // ===== 行业提示词 =====
+
+    suspend fun fetchIndustryPrompts(config: AppConfig): List<IndustryPromptOption> =
+        withContext(Dispatchers.IO) {
+            val request = baseRequest(config, "/api/profile/industry-prompts").get().build()
+            val items = executeJson(request).optJSONArray("items") ?: JSONArray()
+            buildList {
+                for (index in 0 until items.length()) {
+                    val obj = items.optJSONObject(index) ?: continue
+                    add(
+                        IndustryPromptOption(
+                            industryKey = obj.optString("industry_key"),
+                            label = obj.optString("label"),
+                            description = obj.optString("description"),
+                            hasOverride = obj.optBoolean("has_override"),
+                            resolvedPrompt = obj.optString("resolved_prompt"),
+                        ),
+                    )
+                }
+            }
+        }
+
+    suspend fun fetchCurrentIndustry(config: AppConfig): CurrentIndustry =
+        withContext(Dispatchers.IO) {
+            val request = baseRequest(config, "/api/profile/current-industry").get().build()
+            val obj = executeJson(request)
+            CurrentIndustry(
+                industryKey = obj.optString("industry_key"),
+                effective = obj.optBoolean("effective"),
+            )
+        }
+
+    suspend fun setCurrentIndustry(config: AppConfig, industryKey: String): CurrentIndustry =
+        withContext(Dispatchers.IO) {
+            val body = JSONObject().put("industry_key", industryKey).toString().toRequestBody(JSON)
+            val request = baseRequest(config, "/api/profile/current-industry").put(body).build()
+            val obj = executeJson(request)
+            CurrentIndustry(
+                industryKey = obj.optString("industry_key"),
+                effective = obj.optBoolean("effective"),
+            )
+        }
+
+    suspend fun saveIndustryPromptOverride(
+        config: AppConfig,
+        industryKey: String,
+        prompt: String,
+    ): Unit = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("prompt", prompt).toString().toRequestBody(JSON)
+        val request = baseRequest(config, "/api/profile/industry-prompts/$industryKey").put(body).build()
+        executeJson(request)
+    }
+
+    suspend fun deleteIndustryPromptOverride(config: AppConfig, industryKey: String): Unit =
+        withContext(Dispatchers.IO) {
+            val request = baseRequest(config, "/api/profile/industry-prompts/$industryKey").delete().build()
+            executeJson(request)
+        }
+
     // ===== 内部工具 =====
 
     private fun baseTaskJson(taskId: String, prompt: String, options: ImageRequestOptions): JSONObject {
@@ -471,6 +545,7 @@ class ApiClient {
             .put("visibility", normalizeVisibility(options.visibility))
         normalizeQuality(options.quality)?.let { json.put("quality", it) }
         normalizeResolution(options.imageResolution)?.let { json.put("image_resolution", it) }
+        options.industryKey.trim().takeIf { it.isNotEmpty() }?.let { json.put("industry_key", it) }
         return json
     }
 
