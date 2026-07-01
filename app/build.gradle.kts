@@ -16,8 +16,8 @@ android {
         applicationId = "com.chatgpt2api.imageapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "3.0.3"
+        versionCode = 7
+        versionName = "3.0.4"
     }
 
     // 固定 debug 签名：用仓库外的固定 keystore 替代 Android SDK 默认动态生成
